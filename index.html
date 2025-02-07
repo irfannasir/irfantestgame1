@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Cyber Dash</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: black; color: white; font-family: Arial, sans-serif; text-align: center; overflow: hidden; }
+        canvas { display: block; margin: auto; background: rgba(0, 0, 0, 0.2); }
+        #gameArea { width: 100%; height: 100vh; display: flex; align-items: center; justify-content: center; }
+        h1 { text-shadow: 0 0 10px cyan, 0 0 20px cyan; }
+        h2 { font-size: 20px; margin-bottom: 10px; }
+        #powerUpMessage { font-size: 18px; position: absolute; top: 20px; left: 50%; transform: translateX(-50%); color: yellow; display: none; }
+    </style>
+</head>
+<body>
+    <h1>Cyber Dash - Tap to Jump</h1>
+    <h2>Score: <span id="score">0</span></h2>
+    <p id="powerUpMessage">Power-Up Activated!</p>
+    <div id="gameArea">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+    <audio id="jumpSound" src="https://www.myinstants.com/media/sounds/coin-sound-effect.mp3"></audio>
+    <audio id="gameMusic" src="https://www.fesliyanstudios.com/play-mp3/387" loop></audio>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight * 0.7;
+
+        let player = { x: 100, y: canvas.height - 80, width: 50, height: 50, color: "cyan", velocityY: 0, jumping: false };
+        let obstacles = [];
+        let stars = [];
+        let powerUps = [];
+        let score = 0;
+        let gameSpeed = 5;
+        let gravity = 0.5;
+        let isGameOver = false;
+        let isSpeedBoost = false;
+        let shieldActive = false;
+        let slowMotion = false;
+
+        function createStars() {
+            for (let i = 0; i < 50; i++) {
+                stars.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, size: Math.random() * 3 });
+            }
+        }
+
+        function drawStars() {
+            ctx.fillStyle = "white";
+            for (let i = 0; i < stars.length; i++) {
+                ctx.fillRect(stars[i].x, stars[i].y, stars[i].size, stars[i].size);
+                stars[i].y += 1;
+                if (stars[i].y > canvas.height) stars[i].y = 0;
+            }
+        }
+
+        function drawPlayer() {
+            ctx.fillStyle = shieldActive ? "yellow" : player.color;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+        }
+
+        function updatePlayer() {
+            player.y += player.velocityY;
+            player.velocityY += gravity;
+            if (player.y >= canvas.height - 80) {
+                player.y = canvas.height - 80;
+                player.jumping = false;
+            }
+        }
+
+        function createObstacle() {
+            let size = Math.random() * 30 + 20;
+            obstacles.push({ x: canvas.width, y: canvas.height - 80, width: size, height: size, color: "red" });
+        }
+
+        function drawObstacles() {
+            ctx.fillStyle = "red";
+            for (let i = 0; i < obstacles.length; i++) {
+                ctx.fillRect(obstacles[i].x, obstacles[i].y, obstacles[i].width, obstacles[i].height);
+                obstacles[i].x -= gameSpeed;
+                if (obstacles[i].x + obstacles[i].width < 0) {
+                    obstacles.splice(i, 1);
+                    score += 10;
+                    document.getElementById("score").textContent = score;
+                }
+            }
+        }
+
+        function createPowerUp() {
+            let types = ["speed", "shield", "slow"];
+            let type = types[Math.floor(Math.random() * types.length)];
+            powerUps.push({ x: canvas.width, y: canvas.height - 120, width: 20, height: 20, type: type });
+        }
+
+        function drawPowerUps() {
+            ctx.fillStyle = "gold";
+            for (let i = 0; i < powerUps.length; i++) {
+                ctx.fillRect(powerUps[i].x, powerUps[i].y, powerUps[i].width, powerUps[i].height);
+                powerUps[i].x -= gameSpeed;
+
+                if (powerUps[i].x + powerUps[i].width < 0) {
+                    powerUps.splice(i, 1);
+                }
+            }
+        }
+
+        function checkCollision() {
+            for (let i = 0; i < obstacles.length; i++) {
+                let obs = obstacles[i];
+                if (player.x < obs.x + obs.width && player.x + player.width > obs.x &&
+                    player.y < obs.y + obs.height && player.y + player.height > obs.y) {
+                    if (!shieldActive) {
+                        gameOver();
+                    } else {
+                        shieldActive = false;
+                    }
+                }
+            }
+
+            for (let i = 0; i < powerUps.length; i++) {
+                let p = powerUps[i];
+                if (player.x < p.x + p.width && player.x + player.width > p.x &&
+                    player.y < p.y + p.height && player.y + player.height > p.y) {
+                    activatePowerUp(p.type);
+                    powerUps.splice(i, 1);
+                }
+            }
+        }
+
+        function activatePowerUp(type) {
+            let msg = document.getElementById("powerUpMessage");
+            msg.style.display = "block";
+            setTimeout(() => { msg.style.display = "none"; }, 2000);
+
+            if (type === "speed") {
+                isSpeedBoost = true;
+                gameSpeed = 10;
+                setTimeout(() => { isSpeedBoost = false; gameSpeed = 5; }, 5000);
+            } else if (type === "shield") {
+                shieldActive = true;
+            } else if (type === "slow") {
+                slowMotion = true;
+                gameSpeed = 2;
+                setTimeout(() => { slowMotion = false; gameSpeed = 5; }, 5000);
+            }
+        }
+
+        function gameOver() {
+            isGameOver = true;
+            alert("Game Over! Score: " + score);
+            document.location.reload();
+        }
+
+        function jump() {
+            if (!player.jumping && !isGameOver) {
+                player.velocityY = -10;
+                player.jumping = true;
+                document.getElementById("jumpSound").play();
+            }
+        }
+
+        document.addEventListener("keydown", (event) => { if (event.code === "Space") jump(); });
+        document.addEventListener("touchstart", () => { jump(); });
+
+        setInterval(createObstacle, 2000);
+        setInterval(createPowerUp, 10000);
+        createStars();
+        setInterval(() => { gameLoop(); }, 16);
+    </script>
+</body>
+</html>
